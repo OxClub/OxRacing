@@ -193,6 +193,13 @@ jobs:
             --quit \
             --path .
 
+      - name: Start ADB
+        shell: bash
+        run: |
+          "$ANDROID_HOME/platform-tools/adb" kill-server || true
+          "$ANDROID_HOME/platform-tools/adb" start-server
+          "$ANDROID_HOME/platform-tools/adb" version
+
       - name: Export Android APK
         shell: bash
         run: |
