@@ -168,6 +168,7 @@ jobs:
           ls -lh "$TEMPLATE_DIR"
 
       - name: Configure Godot
+        shell: bash
         run: |
           mkdir -p "$HOME/.config/godot"
 
@@ -177,9 +178,14 @@ jobs:
           [resource]
 
           export/android/java_sdk_path = "$JAVA_HOME_17_X64"
+          export/android/android_sdk_path = "$ANDROID_HOME"
           EOF2
 
+          echo "Godot Android configuration:"
+          cat "$HOME/.config/godot/editor_settings-4.tres"
+
       - name: Validate project
+
         run: |
           "$GODOT_BIN" \
             --headless \
