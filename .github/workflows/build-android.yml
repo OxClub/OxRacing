@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Linux dependencies
         run: |
           apt-get update
           apt-get install -y curl unzip fontconfig
@@ -32,25 +32,75 @@ jobs:
           JAVA_BIN="$(readlink -f "$(command -v java)")"
           JAVA_HOME="$(dirname "$(dirname "$JAVA_BIN")")"
 
-          echo "Detected Java:"
+          echo "JAVA_HOME=$JAVA_HOME"
           "$JAVA_HOME/bin/java" -version
 
           echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
-          echo "GODOT_JAVA_PATH=$JAVA_HOME" >> "$GITHUB_ENV"
 
-      - name: Configure Android SDK
+      - name: Find Android SDK
         shell: bash
         run: |
+          echo "Searching for Android SDK..."
+
           if [ -d "/opt/android-sdk" ]; then
-            echo "ANDROID_HOME=/opt/android-sdk" >> "$GITHUB_ENV"
-            echo "ANDROID_SDK_ROOT=/opt/android-sdk" >> "$GITHUB_ENV"
+            SDK="/opt/android-sdk"
           elif [ -d "/usr/local/android-sdk" ]; then
-            echo "ANDROID_HOME=/usr/local/android-sdk" >> "$GITHUB_ENV"
-            echo "ANDROID_SDK_ROOT=/usr/local/android-sdk" >> "$GITHUB_ENV"
+            SDK="/usr/local/android-sdk"
+          elif [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
+            SDK="$ANDROID_HOME"
+          elif [ -n "$ANDROID_SDK_ROOT" ] && [ -d "$ANDROID_SDK_ROOT" ]; then
+            SDK="$ANDROID_SDK_ROOT"
+          else
+            SDK="$(find / -type d -name 'android-sdk' 2>/dev/null | head -n 1)"
           fi
 
-          echo "ANDROID_HOME=${ANDROID_HOME:-not-found}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-not-found}"
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            echo "ERROR: Android SDK was not found."
+            exit 1
+          fi
+
+          echo "Android SDK: $SDK"
+
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$SDK/cmdline-tools/bin" >> "$GITHUB_PATH"
+          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
+          echo "$SDK/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          SDKMANAGER=""
+
+          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          elif [ -x "$ANDROID_HOME/cmdline-tools/bin/sdkmanager" ]; then
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/bin/sdkmanager"
+          elif command -v sdkmanager >/dev/null 2>&1; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          fi
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager was not found."
+            find "$ANDROID_HOME" -name sdkmanager -type f 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Using: $SDKMANAGER"
+
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2"
+
+          echo "Installed build tools:"
+          ls -la "$ANDROID_HOME/build-tools/" || true
+
+          echo "Installed platforms:"
+          ls -la "$ANDROID_HOME/platforms/" || true
 
       - name: Install Godot Android export templates
         shell: bash
@@ -64,7 +114,9 @@ jobs:
             -o /tmp/templates.tpz
 
           mkdir -p /tmp/godot_templates
-          unzip -o /tmp/templates.tpz -d /tmp/godot_templates
+
+          unzip -o /tmp/templates.tpz \
+            -d /tmp/godot_templates
 
           cp /tmp/godot_templates/templates/android_debug.apk \
             "$TEMPLATE_DIR/android_debug.apk"
@@ -74,7 +126,7 @@ jobs:
 
           ls -lh "$TEMPLATE_DIR"
 
-      - name: Configure Godot editor settings
+      - name: Configure Godot Java SDK
         shell: bash
         run: |
           mkdir -p /github/home/.config/godot
@@ -83,10 +135,10 @@ jobs:
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
+
           export/android/java_sdk_path = "$JAVA_HOME"
           EOF2
 
-          echo "Godot Java SDK path configured:"
           cat /github/home/.config/godot/editor_settings-4.tres
 
       - name: Validate project
