@@ -21,11 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            curl \
-            unzip \
-            fontconfig \
-            openjdk-17-jdk
+          sudo apt-get install -y curl unzip fontconfig openjdk-17-jdk
 
       - name: Configure Java
         run: |
@@ -34,23 +30,97 @@ jobs:
 
           "$JAVA_HOME_17_X64/bin/java" -version
 
-      - name: Configure Android SDK
+      - name: Locate Android SDK
+        shell: bash
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          SDK=""
+
+          for candidate in \
+            "$ANDROID_HOME" \
+            "$ANDROID_SDK_ROOT" \
+            "$RUNNER_TOOL_CACHE"/android-sdk/* \
+            "$HOME"/android-sdk \
+            "/usr/local/lib/android/sdk" \
+            "/opt/android-sdk"
+          do
+            if [ -n "$candidate" ] && [ -d "$candidate" ]; then
+              SDK="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$SDK" ]; then
+            echo "Searching filesystem for sdkmanager..."
+            SDKMANAGER_PATH="$(find "$RUNNER_TOOL_CACHE" "$HOME" /usr/local /opt \
+              -type f -name sdkmanager 2>/dev/null | head -n 1 || true)"
+
+            if [ -n "$SDKMANAGER_PATH" ]; then
+              SDK="$(dirname "$(dirname "$(dirname "$SDKMANAGER_PATH")")")"
+            fi
+          fi
+
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            echo "ERROR: Android SDK could not be located."
+            echo "Searching for sdkmanager:"
+            find "$RUNNER_TOOL_CACHE" "$HOME" /usr/local /opt \
+              -type f -name sdkmanager 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Using Android SDK: $SDK"
+
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
+
+          if [ -d "$SDK/cmdline-tools/latest/bin" ]; then
+            echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          fi
+
+          if [ -d "$SDK/cmdline-tools/bin" ]; then
+            echo "$SDK/cmdline-tools/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Locate sdkmanager
+        shell: bash
+        run: |
+          SDKMANAGER=""
+
+          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          elif [ -x "$ANDROID_HOME/cmdline-tools/bin/sdkmanager" ]; then
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/bin/sdkmanager"
+          elif command -v sdkmanager >/dev/null 2>&1; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          else
+            SDKMANAGER="$(find "$ANDROID_HOME" -type f -name sdkmanager 2>/dev/null | head -n 1 || true)"
+          fi
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found."
+            find "$ANDROID_HOME" -type f -name sdkmanager 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "sdkmanager=$SDKMANAGER"
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
 
       - name: Install Android SDK components
+        shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
 
-          sdkmanager \
+          "$SDKMANAGER" \
             "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+            "platforms;android-33" \
+            "build-tools;33.0.2"
 
-          sdkmanager --list_installed
+          echo "Installed Android build tools:"
+          ls -la "$ANDROID_HOME/build-tools"
 
       - name: Download Godot
         run: |
@@ -60,10 +130,7 @@ jobs:
 
           mkdir -p "$HOME/godot"
 
-          unzip -o /tmp/godot.zip \
-            -d "$HOME/godot"
-
-          find "$HOME/godot" -maxdepth 2 -type f -name godot
+          unzip -o /tmp/godot.zip -d "$HOME/godot"
 
           GODOT_BIN="$(find "$HOME/godot" -type f -name godot | head -n 1)"
 
@@ -73,9 +140,11 @@ jobs:
 
           "$GODOT_BIN" --version
 
-      - name: Download Godot Android export templates
+      - name: Install Godot Android templates
         run: |
-          mkdir -p "$HOME/.local/share/godot/export_templates/4.5.1.stable"
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.5.1.stable"
+
+          mkdir -p "$TEMPLATE_DIR"
 
           curl -fL \
             "https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz" \
@@ -83,18 +152,17 @@ jobs:
 
           mkdir -p /tmp/godot_templates
 
-          unzip -o /tmp/templates.tpz \
-            -d /tmp/godot_templates
+          unzip -o /tmp/templates.tpz -d /tmp/godot_templates
 
           cp /tmp/godot_templates/templates/android_debug.apk \
-            "$HOME/.local/share/godot/export_templates/4.5.1.stable/android_debug.apk"
+            "$TEMPLATE_DIR/android_debug.apk"
 
           cp /tmp/godot_templates/templates/android_release.apk \
-            "$HOME/.local/share/godot/export_templates/4.5.1.stable/android_release.apk"
+            "$TEMPLATE_DIR/android_release.apk"
 
-          ls -lh "$HOME/.local/share/godot/export_templates/4.5.1.stable"
+          ls -lh "$TEMPLATE_DIR"
 
-      - name: Create Godot editor settings
+      - name: Configure Godot
         run: |
           mkdir -p "$HOME/.config/godot"
 
@@ -105,8 +173,6 @@ jobs:
 
           export/android/java_sdk_path = "$JAVA_HOME_17_X64"
           EOF2
-
-          cat "$HOME/.config/godot/editor_settings-4.tres"
 
       - name: Validate project
         run: |
@@ -130,7 +196,6 @@ jobs:
         run: |
           test -f build/OxRacing-debug.apk
           ls -lh build/OxRacing-debug.apk
-          file build/OxRacing-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
