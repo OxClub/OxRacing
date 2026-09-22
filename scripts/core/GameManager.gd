@@ -169,7 +169,6 @@ func create_camera() -> void:
 	add_child(camera)
 
 func create_hud() -> void:
-	create_visual_upgrade()
 	var layer = CanvasLayer.new()
 	layer.name = "HUD"
 	add_child(layer)
@@ -354,12 +353,12 @@ func create_track_details() -> void:
 
 	# Continuous alternating curbs around the four main road sections.
 	for x in range(-60, 61, 6):
-		var material = curb_red if (x / 6) as int % 2 == 0 else curb_white
+		var material = curb_red if int(x / 6) % 2 == 0 else curb_white
 		box(self, Vector3(x, 0.16, -56.0), Vector3(3.0, 0.18, 0.65), material)
 		box(self, Vector3(x, 0.16, 56.0), Vector3(3.0, 0.18, 0.65), material)
 
 	for z in range(-60, 61, 6):
-		var material = curb_red if (z / 6) as int % 2 == 0 else curb_white
+		var material = curb_red if int(z / 6) % 2 == 0 else curb_white
 		box(self, Vector3(-56.0, 0.16, z), Vector3(0.65, 0.18, 3.0), material)
 		box(self, Vector3(56.0, 0.16, z), Vector3(0.65, 0.18, 3.0), material)
 
