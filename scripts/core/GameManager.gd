@@ -64,6 +64,7 @@ func _ready() -> void:
 	create_car()
 	create_camera()
 	create_hud()
+\t_add_scenery_upgrade()
 
 func create_environment() -> void:
 	var env_node = WorldEnvironment.new()
@@ -167,6 +168,7 @@ func create_camera() -> void:
 	add_child(camera)
 
 func create_hud() -> void:
+\t_add_scenery_upgrade()
 	var layer = CanvasLayer.new()
 	layer.name = "HUD"
 	add_child(layer)
@@ -277,3 +279,11 @@ func _process(delta: float) -> void:
 	if speed > 30.0 and nitro > 0 and Input.is_key_pressed(KEY_SHIFT):
 		nitro = max(0.0, nitro - 25.0 * delta)
 		speed = min(55.0, speed + 15.0 * delta)
+
+func _add_scenery_upgrade() -> void:
+	var scenery_script := load("res://scripts/core/Scenery.gd")
+	if scenery_script:
+		var scenery := Node3D.new()
+		scenery.name = "CityScenery"
+		scenery.set_script(scenery_script)
+		add_child(scenery)
