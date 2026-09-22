@@ -17,10 +17,10 @@ var line_mat: StandardMaterial3D
 var grass_mat: StandardMaterial3D
 var building_mats: Array[StandardMaterial3D] = []
 
-func mat(color: Color) -> StandardMaterial3D:
+func mat(color: Color, roughness: float = 0.85) -> StandardMaterial3D:
 	var m = StandardMaterial3D.new()
 	m.albedo_color = color
-	m.roughness = 0.85
+	m.roughness = roughness
 	return m
 
 func box(parent: Node3D, pos: Vector3, size: Vector3, material: Material) -> MeshInstance3D:
@@ -31,6 +31,7 @@ func box(parent: Node3D, pos: Vector3, size: Vector3, material: Material) -> Mes
 	n.position = pos
 	n.material_override = material
 	parent.add_child(n)
+\treturn n
 	return n
 
 func cyl(parent: Node3D, pos: Vector3, radius: float, height: float, material: Material) -> MeshInstance3D:
@@ -43,6 +44,7 @@ func cyl(parent: Node3D, pos: Vector3, radius: float, height: float, material: M
 	n.position = pos
 	n.material_override = material
 	parent.add_child(n)
+\treturn n
 	return n
 
 func _ready() -> void:
