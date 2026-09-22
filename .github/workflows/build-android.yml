@@ -21,29 +21,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show environment
+      - name: Install CI dependencies
+        run: |
+          apt-get update
+          apt-get install -y curl unzip fontconfig
+
+      - name: Show versions
         run: |
           godot --version
           java -version || true
-          echo "JAVA_HOME=$JAVA_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          curl --version
+          unzip -v | head -n 2
 
-      - name: Install required Linux packages
-        run: |
-          apt-get update
-          apt-get install -y fontconfig
-
-      - name: Install Android export templates
+      - name: Install Godot Android export templates
         run: |
           mkdir -p /github/home/.local/share/godot/export_templates/4.5.1.stable
 
-          curl -L \
-            https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz \
+          curl -fL \
+            "https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz" \
             -o /tmp/templates.tpz
 
           mkdir -p /tmp/godot_templates
-          unzip -o /tmp/templates.tpz -d /tmp/godot_templates
+
+          unzip -o /tmp/templates.tpz \
+            -d /tmp/godot_templates
+
+          find /tmp/godot_templates -maxdepth 3 -type f
 
           cp /tmp/godot_templates/templates/android_debug.apk \
             /github/home/.local/share/godot/export_templates/4.5.1.stable/android_debug.apk
@@ -51,31 +54,29 @@ jobs:
           cp /tmp/godot_templates/templates/android_release.apk \
             /github/home/.local/share/godot/export_templates/4.5.1.stable/android_release.apk
 
-      - name: Configure Java
-        run: |
-          if [ -z "$JAVA_HOME" ]; then
-            JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(which java)")")")"
-            export JAVA_HOME
-          fi
+          ls -lh /github/home/.local/share/godot/export_templates/4.5.1.stable/
 
+      - name: Check Java
+        run: |
           echo "JAVA_HOME=$JAVA_HOME"
+          which java
+          java -version
 
-      - name: Configure Android SDK
+      - name: Check Android SDK
         run: |
-          if [ -z "$ANDROID_HOME" ] && [ -d "/opt/android-sdk" ]; then
-            export ANDROID_HOME="/opt/android-sdk"
-          fi
-
-          if [ -z "$ANDROID_SDK_ROOT" ] && [ -n "$ANDROID_HOME" ]; then
-            export ANDROID_SDK_ROOT="$ANDROID_HOME"
-          fi
-
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-      - name: Validate project
+          if [ -n "$ANDROID_HOME" ]; then
+            ls -la "$ANDROID_HOME" || true
+          fi
+
+      - name: Validate Godot project
         run: |
-          godot --headless --editor --quit --path .
+          godot --headless \
+            --editor \
+            --quit \
+            --path .
 
       - name: Build Android APK
         run: |
@@ -88,6 +89,7 @@ jobs:
 
       - name: Verify APK
         run: |
+          test -f build/OxRacing-debug.apk
           ls -lh build/OxRacing-debug.apk
           file build/OxRacing-debug.apk
 
