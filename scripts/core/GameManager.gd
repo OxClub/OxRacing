@@ -1,62 +1,62 @@
 extends Node3D
 
-var car: VehicleBody3D
+var car: Node3D
 var camera: Camera3D
+var speed := 0.0
+var steer := 0.0
 var nitro := 100.0
+var lap := 1
+var elapsed := 0.0
 var accelerating := false
 var braking := false
 var left_pressed := false
 var right_pressed := false
-var nitro_pressed := false
 
 var road_mat: StandardMaterial3D
-var curb_mat: StandardMaterial3D
+var line_mat: StandardMaterial3D
 var grass_mat: StandardMaterial3D
-var dark_mat: StandardMaterial3D
 var building_mats: Array[StandardMaterial3D] = []
 
-func mat(c: Color, rough := 0.8) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = c
-	m.roughness = rough
+func mat(color: Color) -> StandardMaterial3D:
+	var m = StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = 0.85
 	return m
 
-func mesh_box(parent: Node3D, p: Vector3, s: Vector3, material: Material) -> MeshInstance3D:
-	var n := MeshInstance3D.new()
-	var b := BoxMesh.new()
-	b.size = s
-	n.mesh = b
-	n.position = p
+func box(parent: Node3D, pos: Vector3, size: Vector3, material: Material) -> MeshInstance3D:
+	var n = MeshInstance3D.new()
+	var mesh = BoxMesh.new()
+	mesh.size = size
+	n.mesh = mesh
+	n.position = pos
 	n.material_override = material
 	parent.add_child(n)
 	return n
 
-func static_box(parent: Node3D, p: Vector3, s: Vector3, material: Material) -> void:
-	var body := StaticBody3D.new()
-	body.position = p
-
-	var collision := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = s
-	collision.shape = shape
-	body.add_child(collision)
-
-	parent.add_child(body)
-	mesh_box(body, Vector3.ZERO, s, material)
+func cyl(parent: Node3D, pos: Vector3, radius: float, height: float, material: Material) -> MeshInstance3D:
+	var n = MeshInstance3D.new()
+	var mesh = CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = height
+	n.mesh = mesh
+	n.position = pos
+	n.material_override = material
+	parent.add_child(n)
+	return n
 
 func _ready() -> void:
-	road_mat = mat(Color("#25282d"))
-	curb_mat = mat(Color("#dedbd0"))
-	grass_mat = mat(Color("#315f36"))
-	dark_mat = mat(Color("#111318"))
+	road_mat = mat(Color("#30343b"))
+	line_mat = mat(Color("#f5e6a8"))
+	grass_mat = mat(Color("#3b7040"))
 
 	building_mats = [
-		mat(Color("#46515d")),
-		mat(Color("#6b7078")),
-		mat(Color("#8b735f")),
-		mat(Color("#3e5967")),
-		mat(Color("#7a5c52")),
-		mat(Color("#596c5b"))
+		mat(Color("#8b96a8")),
+		mat(Color("#b06b52")),
+		mat(Color("#65788f")),
+		mat(Color("#9b8c72")),
+		mat(Color("#56616e")),
+		mat(Color("#b08b78"))
 	]
 
 	create_environment()
@@ -66,420 +66,214 @@ func _ready() -> void:
 	create_hud()
 
 func create_environment() -> void:
-	var world := WorldEnvironment.new()
-	var e := Environment.new()
+	var env_node = WorldEnvironment.new()
+	var env = Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color("#8fc7e8")
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color("#ffffff")
+	env.ambient_light_energy = 0.75
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env_node.environment = env
+	add_child(env_node)
 
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color("#91c9e8")
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color.WHITE
-	e.ambient_light_energy = 0.7
-	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-
-	world.environment = e
-	add_child(world)
-
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-52, -30, 0)
-	sun.light_energy = 1.15
+	var sun = DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-55, -25, 0)
+	sun.light_energy = 1.1
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 180.0
 	add_child(sun)
 
 func create_city() -> void:
-	static_box(
-		self,
-		Vector3(0, -0.3, 0),
-		Vector3(190, 0.5, 190),
-		grass_mat
-	)
+	box(self, Vector3(0, -0.3, 0), Vector3(180, 0.5, 180), grass_mat)
 
-	road(Vector3(0, 0, -65), Vector3(140, 0.25, 20))
-	road(Vector3(0, 0, 65), Vector3(140, 0.25, 20))
-	road(Vector3(-65, 0, 0), Vector3(20, 0.25, 140))
-	road(Vector3(65, 0, 0), Vector3(20, 0.25, 140))
+	# Large rectangular racing circuit.
+	box(self, Vector3(0, 0, -65), Vector3(130, 0.2, 18), road_mat)
+	box(self, Vector3(0, 0, 65), Vector3(130, 0.2, 18), road_mat)
+	box(self, Vector3(-65, 0, 0), Vector3(18, 0.2, 130), road_mat)
+	box(self, Vector3(65, 0, 0), Vector3(18, 0.2, 130), road_mat)
 
-	road(Vector3(-60, 0, -60), Vector3(30, 0.25, 20))
-	road(Vector3(60, 0, -60), Vector3(30, 0.25, 20))
-	road(Vector3(-60, 0, 60), Vector3(30, 0.25, 20))
-	road(Vector3(60, 0, 60), Vector3(30, 0.25, 20))
+	# Inner road connection strips make the circuit continuous.
+	box(self, Vector3(-58, 0, -58), Vector3(32, 0.2, 18), road_mat)
+	box(self, Vector3(58, 0, -58), Vector3(32, 0.2, 18), road_mat)
+	box(self, Vector3(-58, 0, 58), Vector3(32, 0.2, 18), road_mat)
+	box(self, Vector3(58, 0, 58), Vector3(32, 0.2, 18), road_mat)
 
-	for x in range(-58, 59, 12):
-		mesh_box(
-			self,
-			Vector3(x, 0.15, -65),
-			Vector3(6, 0.035, 0.28),
-			curb_mat
-		)
-		mesh_box(
-			self,
-			Vector3(x, 0.15, 65),
-			Vector3(6, 0.035, 0.28),
-			curb_mat
-		)
+	# Road center markings.
+	for x in range(-55, 56, 10):
+		box(self, Vector3(x, 0.13, -65), Vector3(5, 0.04, 0.35), line_mat)
+		box(self, Vector3(x, 0.13, 65), Vector3(5, 0.04, 0.35), line_mat)
 
-	for z in range(-58, 59, 12):
-		mesh_box(
-			self,
-			Vector3(-65, 0.15, z),
-			Vector3(0.28, 0.035, 6),
-			curb_mat
-		)
-		mesh_box(
-			self,
-			Vector3(65, 0.15, z),
-			Vector3(0.28, 0.035, 6),
-			curb_mat
-		)
+	for z in range(-55, 56, 10):
+		box(self, Vector3(-65, 0.13, z), Vector3(0.35, 0.04, 5), line_mat)
+		box(self, Vector3(65, 0.13, z), Vector3(0.35, 0.04, 5), line_mat)
 
-	for x in [-86.0, -66.0, -44.0, -22.0, 22.0, 44.0, 66.0, 86.0]:
-		add_building(Vector3(x, 0, -86))
-		add_building(Vector3(x, 0, 86))
+	# City buildings around the circuit.
+	for x in range(-85, 86, 14):
+		if abs(x) < 75:
+			add_building(Vector3(x, 0, -84))
+			add_building(Vector3(x, 0, 84))
 
-	for z in [-66.0, -44.0, -22.0, 22.0, 44.0, 66.0]:
-		add_building(Vector3(-86, 0, z))
-		add_building(Vector3(86, 0, z))
+	for z in range(-70, 71, 14):
+		if abs(z) < 60:
+			add_building(Vector3(-84, 0, z))
+			add_building(Vector3(84, 0, z))
 
-	for x in range(-52, 53, 26):
-		add_tree(Vector3(x, 0, -52))
-		add_tree(Vector3(x, 0, 52))
-		add_lamp(Vector3(x, 0, -54))
-		add_lamp(Vector3(x, 0, 54))
+	# Extra inner city blocks.
+	for x in [-35.0, -18.0, 18.0, 35.0]:
+		for z in [-35.0, 35.0]:
+			add_building(Vector3(x, 0, z))
 
-func road(p: Vector3, s: Vector3) -> void:
-	static_box(self, p, s, road_mat)
-
-	if s.x > s.z:
-		for x in range(-60, 61, 10):
-			mesh_box(
-				self,
-				Vector3(x, p.y + 0.15, p.z),
-				Vector3(4, 0.035, 0.22),
-				curb_mat
-			)
-	else:
-		for z in range(-60, 61, 10):
-			mesh_box(
-				self,
-				Vector3(p.x, p.y + 0.15, z),
-				Vector3(0.22, 0.035, 4),
-				curb_mat
-			)
+	# Street lights.
+	for x in range(-55, 56, 20):
+		add_street_light(Vector3(x, 0, -53))
+		add_street_light(Vector3(x, 0, 53))
 
 func add_building(p: Vector3) -> void:
-	var seed := abs(int(p.x * 3.0 + p.z * 7.0))
-	var h := 10.0 + float(seed % 5) * 4.0
-	var w := 11.0 + float(seed % 3) * 2.0
-	var d := 10.0 + float((seed / 3) % 3) * 2.0
+	var h = 8.0 + float((abs(int(p.x)) + abs(int(p.z))) % 5) * 3.0
+	var w = 8.0
+	var d = 8.0
+	box(self, Vector3(p.x, h * 0.5, p.z), Vector3(w, h, d), building_mats[(abs(int(p.x)) + abs(int(p.z))) % building_mats.size()])
 
-	var bmat := building_mats[seed % building_mats.size()]
+	# Simple rooftop block.
+	if h > 14:
+		box(self, Vector3(p.x, h + 1.0, p.z), Vector3(3, 2, 3), building_mats[0])
 
-	mesh_box(
-		self,
-		Vector3(p.x, h / 2.0, p.z),
-		Vector3(w, h, d),
-		bmat
-	)
-
-	mesh_box(
-		self,
-		Vector3(p.x, h * 0.56, p.z - d * 0.505),
-		Vector3(w * 0.72, h * 0.62, 0.08),
-		dark_mat
-	)
-
-	if h > 18:
-		mesh_box(
-			self,
-			Vector3(p.x, h + 1.0, p.z),
-			Vector3(w * 0.35, 2.0, d * 0.35),
-			dark_mat
-		)
-
-func add_tree(p: Vector3) -> void:
-	var trunk := mat(Color("#5a3b27"))
-	var leaves := mat(Color("#214f2b"))
-
-	var c := CylinderMesh.new()
-	c.top_radius = 0.18
-	c.bottom_radius = 0.22
-	c.height = 2.5
-
-	var t := MeshInstance3D.new()
-	t.mesh = c
-	t.position = p + Vector3(0, 1.25, 0)
-	t.material_override = trunk
-	add_child(t)
-
-	var s := SphereMesh.new()
-	s.radius = 1.6
-	s.height = 3.2
-
-	var crown := MeshInstance3D.new()
-	crown.mesh = s
-	crown.position = p + Vector3(0, 3.0, 0)
-	crown.material_override = leaves
-	add_child(crown)
-
-func add_lamp(p: Vector3) -> void:
-	var pole := mat(Color("#20242a"))
-	var light := mat(Color("#ffe7a0"))
-
-	var c := CylinderMesh.new()
-	c.top_radius = 0.1
-	c.bottom_radius = 0.13
-	c.height = 6.0
-
-	var n := MeshInstance3D.new()
-	n.mesh = c
-	n.position = p + Vector3(0, 3, 0)
-	n.material_override = pole
-	add_child(n)
-
-	mesh_box(
-		self,
-		p + Vector3(0.55, 5.85, 0),
-		Vector3(1.1, 0.12, 0.12),
-		pole
-	)
-
-	mesh_box(
-		self,
-		p + Vector3(1.05, 5.7, 0),
-		Vector3(0.3, 0.3, 0.3),
-		light
-	)
+func add_street_light(p: Vector3) -> void:
+	var pole_mat = mat(Color("#25282b"))
+	cyl(self, p + Vector3(0, 3, 0), 0.12, 6.0, pole_mat)
+	box(self, p + Vector3(0.7, 6.0, 0), Vector3(1.5, 0.12, 0.12), pole_mat)
+	var light_mat = mat(Color("#fff2ad"))
+	box(self, p + Vector3(1.4, 5.8, 0), Vector3(0.35, 0.35, 0.35), light_mat)
 
 func create_car() -> void:
-	car = VehicleBody3D.new()
+	car = Node3D.new()
 	car.name = "PlayerCar"
-	car.mass = 1100.0
-	car.linear_damp = 0.15
-	car.angular_damp = 1.5
-	car.position = Vector3(0, 1.4, -65)
+	car.position = Vector3(0, 1.0, -65)
 	add_child(car)
 
-	var collision := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
+	var body = box(car, Vector3(0, 0.5, 0), Vector3(2.5, 0.7, 4.4), mat(Color("#d51f2f")))
+	box(car, Vector3(0, 1.0, 0.1), Vector3(1.8, 0.55, 2.0), mat(Color("#18212d")))
 
-	shape.size = Vector3(1.9, 0.7, 4.0)
-	collision.shape = shape
-	collision.position = Vector3(0, 0.65, 0)
-
-	car.add_child(collision)
-
-	mesh_box(
-		car,
-		Vector3(0, 0.7, 0),
-		Vector3(2.1, 0.55, 4.1),
-		mat(Color("#c91f31"), 0.45)
-	)
-
-	mesh_box(
-		car,
-		Vector3(0, 1.05, 0.15),
-		Vector3(1.55, 0.48, 1.65),
-		mat(Color("#101a24"), 0.25)
-	)
-
-	mesh_box(
-		car,
-		Vector3(0, 0.98, -1.5),
-		Vector3(1.75, 0.12, 0.65),
-		mat(Color("#e5e5e5"), 0.35)
-	)
-
-	mesh_box(
-		car,
-		Vector3(0, 0.55, 2.0),
-		Vector3(1.8, 0.18, 0.35),
-		dark_mat
-	)
-
-	add_wheel(Vector3(-1.0, 0.25, -1.35), true, true)
-	add_wheel(Vector3(1.0, 0.25, -1.35), true, true)
-	add_wheel(Vector3(-1.0, 0.25, 1.35), false, true)
-	add_wheel(Vector3(1.0, 0.25, 1.35), false, true)
-
-func add_wheel(p: Vector3, steering: bool, traction: bool) -> void:
-	var w := VehicleWheel3D.new()
-
-	w.position = p
-	w.wheel_radius = 0.38
-	w.wheel_rest_length = 0.16
-	w.suspension_travel = 0.2
-	w.suspension_stiffness = 70.0
-	w.damping_compression = 0.45
-	w.damping_relaxation = 0.55
-	w.wheel_friction_slip = 9.0 if steering else 7.5
-	w.wheel_roll_influence = 0.08
-	w.use_as_steering = steering
-	w.use_as_traction = traction
-
-	car.add_child(w)
-
-	var tire := MeshInstance3D.new()
-	var cyl := CylinderMesh.new()
-
-	cyl.top_radius = 0.38
-	cyl.bottom_radius = 0.38
-	cyl.height = 0.28
-
-	tire.mesh = cyl
-	tire.rotation_degrees = Vector3(90, 0, 0)
-	tire.material_override = dark_mat
-
-	w.add_child(tire)
+	var wheel_mat = mat(Color("#111111"))
+	for x in [-1.25, 1.25]:
+		for z in [-1.35, 1.35]:
+			var w = cyl(car, Vector3(x, 0.25, z), 0.42, 0.3, wheel_mat)
+			w.rotation_degrees = Vector3(90, 0, 0)
 
 func create_camera() -> void:
 	camera = Camera3D.new()
 	camera.current = true
-	camera.fov = 68
+	camera.fov = 70
 	add_child(camera)
 
-	camera.global_position = Vector3(0, 7, -75)
-	camera.look_at(car.global_position)
-
 func create_hud() -> void:
-	var layer := CanvasLayer.new()
+	var layer = CanvasLayer.new()
 	layer.name = "HUD"
 	add_child(layer)
 
-	label(layer, "OXRACING", Vector2(35, 24), 32, "Title")
-	label(layer, "LAP 1 / 3", Vector2(35, 66), 23, "Lap")
-	label(layer, "SPEED 000 KM/H", Vector2(35, 100), 22, "Speed")
-	label(layer, "NITRO 100%", Vector2(35, 132), 20, "Nitro")
+	var title = Label.new()
+	title.text = "OXRACING"
+	title.position = Vector2(35, 25)
+	title.add_theme_font_size_override("font_size", 32)
+	layer.add_child(title)
 
-	button(layer, "◀", Vector2(35, 575), Vector2(105, 105), "left")
-	button(layer, "▶", Vector2(155, 575), Vector2(105, 105), "right")
-	button(layer, "BRAKE", Vector2(1000, 600), Vector2(105, 70), "brake")
-	button(layer, "GO", Vector2(1135, 545), Vector2(110, 110), "accelerate")
-	button(layer, "NITRO", Vector2(1000, 515), Vector2(105, 65), "nitro")
+	var lap_label = Label.new()
+	lap_label.name = "Lap"
+	lap_label.text = "LAP 1 / 3"
+	lap_label.position = Vector2(35, 70)
+	lap_label.add_theme_font_size_override("font_size", 24)
+	layer.add_child(lap_label)
 
-func label(
-	layer: CanvasLayer,
-	text_value: String,
-	pos: Vector2,
-	size: int,
-	name_value: String
-) -> void:
-	var l := Label.new()
-	l.name = name_value
-	l.text = text_value
-	l.position = pos
-	l.add_theme_font_size_override("font_size", size)
-	layer.add_child(l)
+	var speed_label = Label.new()
+	speed_label.name = "Speed"
+	speed_label.position = Vector2(35, 105)
+	speed_label.add_theme_font_size_override("font_size", 22)
+	layer.add_child(speed_label)
 
-func button(
-	layer: CanvasLayer,
-	text_value: String,
-	pos: Vector2,
-	size: Vector2,
-	action: String
-) -> void:
-	var b := Button.new()
+	var nitro_label = Label.new()
+	nitro_label.name = "Nitro"
+	nitro_label.position = Vector2(35, 138)
+	nitro_label.add_theme_font_size_override("font_size", 20)
+	layer.add_child(nitro_label)
 
+	make_button(layer, "◀", Vector2(45, 570), Vector2(100, 100), "left")
+	make_button(layer, "▶", Vector2(165, 570), Vector2(100, 100), "right")
+	make_button(layer, "BRAKE", Vector2(1000, 585), Vector2(110, 75), "brake")
+	make_button(layer, "GO", Vector2(1130, 540), Vector2(110, 110), "accelerate")
+	make_button(layer, "NITRO", Vector2(1000, 495), Vector2(110, 65), "nitro")
+
+func make_button(layer: CanvasLayer, text_value: String, pos: Vector2, size: Vector2, action: String) -> void:
+	var b = Button.new()
 	b.text = text_value
 	b.position = pos
 	b.size = size
 	b.add_theme_font_size_override("font_size", 22)
-
 	layer.add_child(b)
 
 	b.button_down.connect(func():
 		set_action(action, true)
 	)
-
 	b.button_up.connect(func():
 		set_action(action, false)
 	)
 
 func set_action(action: String, value: bool) -> void:
 	match action:
-		"left":
-			left_pressed = value
-		"right":
-			right_pressed = value
-		"accelerate":
-			accelerating = value
-		"brake":
-			braking = value
+		"left": left_pressed = value
+		"right": right_pressed = value
+		"accelerate": accelerating = value
+		"brake": braking = value
 		"nitro":
-			nitro_pressed = value
+			if value and nitro > 0:
+				speed = min(speed + 12.0, 55.0)
 
-func _physics_process(delta: float) -> void:
+func _process(delta: float) -> void:
 	if car == null:
 		return
 
-	var accel := accelerating \
-		or Input.is_key_pressed(KEY_W) \
-		or Input.is_key_pressed(KEY_UP)
+	elapsed += delta
 
-	var brake := braking \
-		or Input.is_key_pressed(KEY_S) \
-		or Input.is_key_pressed(KEY_DOWN)
+	var keyboard_accel = Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP)
+	var keyboard_brake = Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN)
+	var keyboard_left = Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT)
+	var keyboard_right = Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT)
 
-	var left := left_pressed \
-		or Input.is_key_pressed(KEY_A) \
-		or Input.is_key_pressed(KEY_LEFT)
-
-	var right := right_pressed \
-		or Input.is_key_pressed(KEY_D) \
-		or Input.is_key_pressed(KEY_RIGHT)
-
-	var boost := nitro_pressed or Input.is_key_pressed(KEY_SHIFT)
-
-	var steer_input := 0.0
-
-	if left:
-		steer_input -= 1.0
-
-	if right:
-		steer_input += 1.0
-
-	var speed_kmh := car.linear_velocity.length() * 3.6
-
-	var steer_limit := lerp(
-		0.52,
-		0.18,
-		clamp(speed_kmh / 140.0, 0.0, 1.0)
-	)
-
-	car.steering = move_toward(
-		car.steering,
-		steer_input * steer_limit,
-		delta * 4.5
-	)
-
-	car.engine_force = 0.0
+	var accel = accelerating or keyboard_accel
+	var brake = braking or keyboard_brake
+	var left = left_pressed or keyboard_left
+	var right = right_pressed or keyboard_right
 
 	if accel:
-		car.engine_force = 45.0
-
-	if boost and accel and nitro > 0.0:
-		car.engine_force = 85.0
-		nitro = max(0.0, nitro - 32.0 * delta)
+		speed = move_toward(speed, 38.0, 22.0 * delta)
+	else:
+		speed = move_toward(speed, 0.0, 7.0 * delta)
 
 	if brake:
-		car.brake = 32.0
-	else:
-		car.brake = 0.0
+		speed = move_toward(speed, 0.0, 35.0 * delta)
 
-	var target := (
-		car.global_position
-		+ car.global_transform.basis.z * 10.5
-		+ Vector3(0, 5.8, 0)
-	)
+	var steering = 0.0
+	if left:
+		steering -= 1.0
+	if right:
+		steering += 1.0
 
-	camera.global_position = camera.global_position.lerp(
-		target,
-		min(delta * 7.0, 1.0)
-	)
+	car.rotate_y(-steering * 1.7 * delta * clamp(speed / 15.0, 0.2, 2.0))
+	car.translate_object_local(Vector3(0, 0, -speed * delta))
 
-	camera.look_at(car.global_position + Vector3(0, 0.8, 0))
+	# Keep the player roughly inside the city.
+	car.position.x = clamp(car.position.x, -72.0, 72.0)
+	car.position.z = clamp(car.position.z, -72.0, 72.0)
 
-	var hud := get_node_or_null("HUD")
+	# Chase camera.
+	var behind = car.global_position + car.global_transform.basis.z * 10.0 + Vector3(0, 6, 0)
+	camera.global_position = camera.global_position.lerp(behind, min(delta * 6.0, 1.0))
+	camera.look_at(car.global_position + Vector3(0, 1, 0))
 
+	var hud = get_node_or_null("HUD")
 	if hud:
-		hud.get_node("Speed").text = "SPEED %03d KM/H" % int(speed_kmh)
-		hud.get_node("Nitro").text = "NITRO %03d%%" % int(nitro)
+		hud.get_node("Speed").text = "SPEED  %03d KM/H" % int(speed * 3.0)
+		hud.get_node("Nitro").text = "NITRO  %03d%%" % int(nitro)
+
+	if speed > 30.0 and nitro > 0 and Input.is_key_pressed(KEY_SHIFT):
+		nitro = max(0.0, nitro - 25.0 * delta)
+		speed = min(55.0, speed + 15.0 * delta)
