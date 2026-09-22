@@ -64,7 +64,7 @@ func _ready() -> void:
 	create_car()
 	create_camera()
 	create_hud()
-\t_add_scenery_upgrade()
+	create_trees()
 
 func create_environment() -> void:
 	var env_node = WorldEnvironment.new()
@@ -168,7 +168,7 @@ func create_camera() -> void:
 	add_child(camera)
 
 func create_hud() -> void:
-\t_add_scenery_upgrade()
+	create_trees()
 	var layer = CanvasLayer.new()
 	layer.name = "HUD"
 	add_child(layer)
@@ -280,10 +280,61 @@ func _process(delta: float) -> void:
 		nitro = max(0.0, nitro - 25.0 * delta)
 		speed = min(55.0, speed + 15.0 * delta)
 
-func _add_scenery_upgrade() -> void:
 	var scenery_script := load("res://scripts/core/Scenery.gd")
 	if scenery_script:
 		var scenery := Node3D.new()
 		scenery.name = "CityScenery"
 		scenery.set_script(scenery_script)
 		add_child(scenery)
+
+func create_trees() -> void:
+	var trunk_mat := mat(Color("#5a3824"))
+	var leaf1 := mat(Color("#245b2b"))
+	var leaf2 := mat(Color("#347337"))
+	var leaf3 := mat(Color("#4b843e"))
+
+	var positions := [
+		Vector3(-48, 0, -54), Vector3(-36, 0, -54),
+		Vector3(-24, 0, -54), Vector3(-12, 0, -54),
+		Vector3(12, 0, -54), Vector3(24, 0, -54),
+		Vector3(36, 0, -54), Vector3(48, 0, -54),
+		Vector3(-48, 0, 54), Vector3(-36, 0, 54),
+		Vector3(-24, 0, 54), Vector3(-12, 0, 54),
+		Vector3(12, 0, 54), Vector3(24, 0, 54),
+		Vector3(36, 0, 54), Vector3(48, 0, 54),
+		Vector3(-54, 0, -42), Vector3(-54, 0, -30),
+		Vector3(-54, 0, -18), Vector3(-54, 0, 18),
+		Vector3(-54, 0, 30), Vector3(-54, 0, 42),
+		Vector3(54, 0, -42), Vector3(54, 0, -30),
+		Vector3(54, 0, -18), Vector3(54, 0, 18),
+		Vector3(54, 0, 30), Vector3(54, 0, 42)
+	]
+
+	for i in positions.size():
+		var p = positions[i]
+
+		cyl(
+			self,
+			p + Vector3(0, 1.3, 0),
+			0.22,
+			2.6,
+			trunk_mat
+		)
+
+		var crown := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		var r := 1.35 + float(i % 3) * 0.25
+		sphere.radius = r
+		sphere.height = r * 2.0
+		crown.mesh = sphere
+		crown.position = p + Vector3(0, 3.0 + float(i % 2) * 0.4, 0)
+		crown.scale = Vector3(1.0, 1.15, 1.0)
+
+		if i % 3 == 0:
+			crown.material_override = leaf1
+		elif i % 3 == 1:
+			crown.material_override = leaf2
+		else:
+			crown.material_override = leaf3
+
+		add_child(crown)
