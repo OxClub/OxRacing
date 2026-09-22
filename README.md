@@ -1,34 +1,38 @@
-# OxRacing MVP
+# OxRacing
 
-Script-generated Unity 6 mobile racing-game foundation.
+OxRacing is a 3D mobile racing game built with Godot 4.
 
-## Included
-- Android build pipeline for GitHub Actions
-- One playable arcade car
-- Rigidbody-based arcade physics
-- Nitro boost
-- Drift assist
-- Touch controls
-- Tilt steering
-- Gamepad support through Unity Input System
-- Chase camera
-- Lap/checkpoint race manager
-- Simple waypoint AI
-- Local JSON save system
-- Garage/upgrades foundation
-- Offline-first architecture
-- Mobile quality settings
+## Build system
 
-## Build
-The GitHub Actions workflow uses GameCI and Unity 6 LTS (`6000.0.43f1`).
+Android builds are handled by GitHub Actions.
 
-Required GitHub repository secret:
-`UNITY_LICENSE`
+Push to `main` and GitHub Actions will build a debug APK.
 
-For an Android build, push the repository and open:
-Actions → OxRacing Android Build
+You can also manually start the workflow from:
 
-The workflow uploads an APK artifact.
+Actions → Build OxRacing Android → Run workflow
 
-## Important
-This MVP intentionally uses primitive/procedural geometry and placeholder UI so the project can be built before importing commercial 3D assets. Replace the placeholder car/track art later without changing the gameplay architecture.
+## Structure
+
+- `scenes/` - Godot scenes
+- `scripts/` - GDScript
+- `assets/` - game assets
+- `data/` - game data
+- `.github/workflows/` - GitHub Actions
+
+## Development roadmap
+
+1. Godot project
+2. Android CI
+3. Racing track
+4. Player car
+5. Camera
+6. Touch controls
+7. AI opponents
+8. Checkpoints and laps
+9. Race HUD
+10. Garage
+11. Car upgrades
+12. Coins/rewards
+13. Ads
+14. Google Play release
