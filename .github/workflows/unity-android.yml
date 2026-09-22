@@ -3,11 +3,11 @@ name: OxRacing Android Build
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   buildAndroid:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +16,7 @@ jobs:
         with:
           lfs: true
 
-      - name: Cache Unity
+      - name: Cache Unity Library
         uses: actions/cache@v4
         with:
           path: Library
@@ -24,7 +24,7 @@ jobs:
           restore-keys: |
             Library-OxRacing-
 
-      - name: Build Android
+      - name: Build Android APK
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -32,8 +32,7 @@ jobs:
           projectPath: .
           targetPlatform: Android
           unityVersion: 6000.0.43f1
-          androidExportType: apk
-          androidArchitecture: ARM64
+          androidExportType: androidPackage
           buildMethod: OxRacing.Editor.BuildScript.BuildAndroid
 
       - name: Upload APK
