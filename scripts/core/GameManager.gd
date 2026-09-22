@@ -64,6 +64,7 @@ func _ready() -> void:
 	create_car()
 	create_camera()
 	create_hud()
+	create_visual_upgrade()
 	create_trees()
 
 func create_environment() -> void:
@@ -168,7 +169,7 @@ func create_camera() -> void:
 	add_child(camera)
 
 func create_hud() -> void:
-	create_trees()
+	create_visual_upgrade()
 	var layer = CanvasLayer.new()
 	layer.name = "HUD"
 	add_child(layer)
@@ -280,12 +281,6 @@ func _process(delta: float) -> void:
 		nitro = max(0.0, nitro - 25.0 * delta)
 		speed = min(55.0, speed + 15.0 * delta)
 
-	var scenery_script := load("res://scripts/core/Scenery.gd")
-	if scenery_script:
-		var scenery := Node3D.new()
-		scenery.name = "CityScenery"
-		scenery.set_script(scenery_script)
-		add_child(scenery)
 
 func create_trees() -> void:
 	var trunk_mat := mat(Color("#5a3824"))
@@ -338,3 +333,236 @@ func create_trees() -> void:
 			crown.material_override = leaf3
 
 		add_child(crown)
+
+func create_visual_upgrade() -> void:
+	create_track_details()
+	create_mountains()
+	create_realistic_trees()
+	create_car_details()
+	
+	var world := get_node_or_null("WorldEnvironment")
+	if world and world.environment:
+		world.environment.background_mode = Environment.BG_COLOR
+		world.environment.background_color = Color("#79b9df")
+		world.environment.ambient_light_energy = 0.9
+
+func create_track_details() -> void:
+	var curb_red := mat(Color("#d83a3a"))
+	var curb_white := mat(Color("#eeeeea"))
+	var barrier := mat(Color("#d6d9dc"))
+	var barrier_dark := mat(Color("#4b5055"))
+
+	# Continuous alternating curbs around the four main road sections.
+	for x in range(-60, 61, 6):
+		var material = curb_red if (x / 6) as int % 2 == 0 else curb_white
+		box(self, Vector3(x, 0.16, -56.0), Vector3(3.0, 0.18, 0.65), material)
+		box(self, Vector3(x, 0.16, 56.0), Vector3(3.0, 0.18, 0.65), material)
+
+	for z in range(-60, 61, 6):
+		var material = curb_red if (z / 6) as int % 2 == 0 else curb_white
+		box(self, Vector3(-56.0, 0.16, z), Vector3(0.65, 0.18, 3.0), material)
+		box(self, Vector3(56.0, 0.16, z), Vector3(0.65, 0.18, 3.0), material)
+
+	# Lightweight roadside guardrails.
+	for x in range(-48, 49, 8):
+		box(self, Vector3(x, 1.0, -51.0), Vector3(6.5, 0.16, 0.16), barrier)
+		box(self, Vector3(x, 0.45, -51.0), Vector3(0.14, 0.9, 0.14), barrier_dark)
+		box(self, Vector3(x, 1.0, 51.0), Vector3(6.5, 0.16, 0.16), barrier)
+		box(self, Vector3(x, 0.45, 51.0), Vector3(0.14, 0.9, 0.14), barrier_dark)
+
+func create_mountains() -> void:
+	var mountain_mats := [
+		mat(Color("#536d72")),
+		mat(Color("#617b7e")),
+		mat(Color("#70898a")),
+		mat(Color("#465f64"))
+	]
+
+	var mountain_positions := [
+		Vector3(-85, 0, -125),
+		Vector3(-45, 0, -135),
+		Vector3(0, 0, -145),
+		Vector3(45, 0, -135),
+		Vector3(85, 0, -125),
+		Vector3(-110, 0, -80),
+		Vector3(110, 0, -80)
+	]
+
+	for i in mountain_positions.size():
+		var p = mountain_positions[i]
+		var mountain := MeshInstance3D.new()
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 0.0
+		mesh.bottom_radius = 20.0 + float(i % 3) * 6.0
+		mesh.height = 38.0 + float(i % 4) * 9.0
+		mountain.mesh = mesh
+		mountain.position = p + Vector3(0, mesh.height * 0.5 - 4.0, 0)
+		mountain.material_override = mountain_mats[i % mountain_mats.size()]
+		add_child(mountain)
+
+func create_realistic_trees() -> void:
+	var trunk_mat := mat(Color("#553622"))
+	var branch_mat := mat(Color("#634329"))
+
+	var leaf_mats := [
+		mat(Color("#183f24")),
+		mat(Color("#245b2b")),
+		mat(Color("#317038")),
+		mat(Color("#3f7d3b")),
+		mat(Color("#285f30"))
+	]
+
+	var positions := [
+		Vector3(-48, 0, -52),
+		Vector3(-34, 0, -52),
+		Vector3(-20, 0, -52),
+		Vector3(20, 0, -52),
+		Vector3(34, 0, -52),
+		Vector3(48, 0, -52),
+
+		Vector3(-48, 0, 52),
+		Vector3(-34, 0, 52),
+		Vector3(-20, 0, 52),
+		Vector3(20, 0, 52),
+		Vector3(34, 0, 52),
+		Vector3(48, 0, 52),
+
+		Vector3(-52, 0, -40),
+		Vector3(-52, 0, -25),
+		Vector3(-52, 0, 25),
+		Vector3(-52, 0, 40),
+
+		Vector3(52, 0, -40),
+		Vector3(52, 0, -25),
+		Vector3(52, 0, 25),
+		Vector3(52, 0, 40)
+	]
+
+	for i in positions.size():
+		var p = positions[i]
+
+		# Main trunk.
+		cyl(self, p + Vector3(0, 1.5, 0), 0.20, 3.0, trunk_mat)
+
+		# Branches.
+		var branch1 := cyl(
+			self,
+			p + Vector3(0.35, 2.65, 0),
+			0.08,
+			1.5,
+			branch_mat
+		)
+		branch1.rotation_degrees = Vector3(0, 0, -35)
+
+		var branch2 := cyl(
+			self,
+			p + Vector3(-0.35, 2.75, 0),
+			0.08,
+			1.4,
+			branch_mat
+		)
+		branch2.rotation_degrees = Vector3(0, 0, 35)
+
+		# Several irregular leaf clusters.
+		for j in 5:
+			var leaf := MeshInstance3D.new()
+			var sphere := SphereMesh.new()
+
+			var r := 0.65 + float((i + j) % 3) * 0.18
+			sphere.radius = r
+			sphere.height = r * 1.55
+
+			leaf.mesh = sphere
+
+			var ox := float((j % 3) - 1) * 0.65
+			var oz := float(((j + i) % 3) - 1) * 0.5
+			var oy := 3.1 + float(j / 2) * 0.45
+
+			leaf.position = p + Vector3(ox, oy, oz)
+			leaf.scale = Vector3(1.0, 0.72, 0.85)
+			leaf.material_override = leaf_mats[(i + j) % leaf_mats.size()]
+			add_child(leaf)
+
+	# Low bushes along some sections.
+	var bush_mat := mat(Color("#2c652f"))
+
+	for p in [
+		Vector3(-44, 0, -49),
+		Vector3(-28, 0, -49),
+		Vector3(28, 0, -49),
+		Vector3(44, 0, -49),
+		Vector3(-44, 0, 49),
+		Vector3(-28, 0, 49),
+		Vector3(28, 0, 49),
+		Vector3(44, 0, 49)
+	]:
+		var bush := MeshInstance3D.new()
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.75
+		mesh.height = 1.1
+		bush.mesh = mesh
+		bush.position = p + Vector3(0, 0.5, 0)
+		bush.scale = Vector3(1.5, 0.75, 1.0)
+		bush.material_override = bush_mat
+		add_child(bush)
+
+func create_car_details() -> void:
+	if car == null:
+		return
+
+	var body_red := mat(Color("#e52a38"), 0.28)
+	body_red.metallic = 0.55
+
+	var black := mat(Color("#10151b"), 0.25)
+	black.metallic = 0.35
+
+	var glass := mat(Color("#172c3d"), 0.15)
+	glass.metallic = 0.2
+
+	var white := mat(Color("#f4f4ed"), 0.25)
+	var headlight := mat(Color("#fff5c4"), 0.15)
+	var tail := mat(Color("#ff1728"), 0.2)
+
+	# Front hood.
+	box(car, Vector3(0, 0.82, -1.35), Vector3(1.9, 0.22, 1.15), body_red)
+
+	# Windshield.
+	box(car, Vector3(0, 1.23, 0.05), Vector3(1.65, 0.48, 1.15), glass)
+
+	# Roof.
+	box(car, Vector3(0, 1.38, 0.55), Vector3(1.55, 0.18, 1.05), black)
+
+	# Front bumper.
+	box(car, Vector3(0, 0.43, -2.15), Vector3(2.15, 0.28, 0.25), black)
+
+	# Rear spoiler.
+	box(car, Vector3(0, 1.15, 1.95), Vector3(2.15, 0.12, 0.20), black)
+	box(car, Vector3(-0.75, 1.0, 1.95), Vector3(0.12, 0.45, 0.12), black)
+	box(car, Vector3(0.75, 1.0, 1.95), Vector3(0.12, 0.45, 0.12), black)
+
+	# Headlights.
+	box(car, Vector3(-0.68, 0.76, -2.16), Vector3(0.42, 0.20, 0.08), headlight)
+	box(car, Vector3(0.68, 0.76, -2.16), Vector3(0.42, 0.20, 0.08), headlight)
+
+	# Rear lights.
+	box(car, Vector3(-0.65, 0.72, 2.18), Vector3(0.48, 0.18, 0.08), tail)
+	box(car, Vector3(0.65, 0.72, 2.18), Vector3(0.48, 0.18, 0.08), tail)
+
+	# Side skirts.
+	box(car, Vector3(-1.22, 0.48, 0), Vector3(0.12, 0.22, 2.5), black)
+	box(car, Vector3(1.22, 0.48, 0), Vector3(0.12, 0.22, 2.5), black)
+
+	# Wheel rims.
+	var rim_mat := mat(Color("#c4c7ca"), 0.22)
+	rim_mat.metallic = 0.8
+
+	for x in [-1.25, 1.25]:
+		for z in [-1.35, 1.35]:
+			var rim := cyl(
+				car,
+				Vector3(x, 0.25, z - 0.17),
+				0.23,
+				0.08,
+				rim_mat
+			)
+			rim.rotation_degrees = Vector3(90, 0, 0)
